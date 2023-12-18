@@ -9,48 +9,83 @@ import torch
 if torch.cuda.is_available():
     print("torch CUDA is available")
 
-label_list = [
-    'O',       # Outside of a named entity
-    'B-MISC',  # Beginning of a miscellaneous entity right after another miscellaneous entity
-    'I-MISC',  # Miscellaneous entity
-    'B-PER',   # Beginning of a person's name right after another person's name
-    'I-PER',   # Person's name
-    'B-ORG',   # Beginning of an organisation right after another organisation
-    'I-ORG',   # Organisation
-    'B-LOC',   # Beginning of a location right after another location
-    'I-LOC'    # Location
-]
-label_encoding_dict = {'I-PRG': 2,'I-I-MISC': 2, 'I-OR': 6, 'O': 0, 'I-': 0, 'VMISC': 0, 'B-PER': 3, 'I-PER': 4, 'B-ORG': 5, 'I-ORG': 6, 'B-LOC': 7, 'I-LOC': 8, 'B-MISC': 1, 'I-MISC': 2}
+#-----------------------------------------------------------------------------------------------------------------------
 
-task = "ner"
 model_checkpoint = "xlnet-base-cased"
 batch_size = 16
 
 tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
+
+#-----------------------------------------------------------------------------------------------------------------------
+
+all_tags = {
+    "O": 0,
+    "B-PER": 1,
+    "I-PER": 2,
+    "B-ORG": 3,
+    "I-ORG": 4,
+    "B-LOC": 5,
+    "I-LOC": 6,
+    "B-ANIM": 7,
+    "I-ANIM": 8,
+    "B-BIO": 9,
+    "I-BIO": 10,
+    "B-CEL": 11,
+    "I-CEL": 12,
+    "B-DIS": 13,
+    "I-DIS": 14,
+    "B-EVE": 15,
+    "I-EVE": 16,
+    "B-FOOD": 17,
+    "I-FOOD": 18,
+    "B-INST": 19,
+    "I-INST": 20,
+    "B-MEDIA": 21,
+    "I-MEDIA": 22,
+    "B-MYTH": 23,
+    "I-MYTH": 24,
+    "B-PLANT": 25,
+    "I-PLANT": 26,
+    "B-TIME": 27,
+    "I-TIME": 28,
+    "B-VEHI": 29,
+    "I-VEHI": 30,
+}
+
+reduced_tags = {
+    "O": 0,
+    "B-PER": 1,
+    "I-PER": 2,
+    "B-ORG": 3,
+    "I-ORG": 4,
+    "B-LOC": 5,
+    "I-LOC": 6,
+    "B-ANIM": 7,
+    "I-ANIM": 8,
+    "B-DIS": 13,
+    "I-DIS": 14,
+}
+
+label_list = all_tags
 
 def tokenize_and_align_labels(examples):
     label_all_tokens = True
     tokenized_inputs = tokenizer(list(examples["tokens"]), truncation=True, is_split_into_words=True)
 
     labels = []
-    for i, label in enumerate(examples[f"{task}_tags"]):
+    for i, label in enumerate(examples["ner_tags"]):
         word_ids = tokenized_inputs.word_ids(batch_index=i)
         previous_word_idx = None
         label_ids = []
         for word_idx in word_ids:
-            # Special tokens have a word id that is None. We set the label to -100 so they are automatically
-            # ignored in the loss function.
             if word_idx is None:
                 label_ids.append(-100)
             elif label[word_idx] == '0':
                 label_ids.append(0)
-            # We set the label for the first token of each word.
             elif word_idx != previous_word_idx:
-                label_ids.append(label_encoding_dict[label[word_idx]])
-            # For the other tokens in a word, we set the label to either the current label or -100, depending on
-            # the label_all_tokens flag.
+                label_ids.append(label[word_idx])
             else:
-                label_ids.append(label_encoding_dict[label[word_idx]] if label_all_tokens else -100)
+                label_ids.append(label[word_idx] if label_all_tokens else -100)
             previous_word_idx = word_idx
 
         labels.append(label_ids)
@@ -58,15 +93,26 @@ def tokenize_and_align_labels(examples):
     tokenized_inputs["labels"] = labels
     return tokenized_inputs
 
-train_dataset, test_dataset = get_tokens.get_un_token_dataset('./UN-named-entity-recognition/tagged-training/', './UN-named-entity-recognition/tagged-test/')
+
+dataset = load_dataset("Babelscape/multinerd", split=None)
+dataset_split = tuple(dataset.keys())
+
+for split in self.data_split:
+    dataset[split] = dataset[split].filter(lambda data: data["lang"] == "en")
+    dataset[split] = dataset[split].remove_columns("lang")
+
+train_dataset = datasets["train"]
+test_dataset = datasets["test"]
 
 train_tokenized_datasets = train_dataset.map(tokenize_and_align_labels, batched=True)
 test_tokenized_datasets = test_dataset.map(tokenize_and_align_labels, batched=True)
 
+
+
 model = AutoModelForTokenClassification.from_pretrained(model_checkpoint, num_labels=len(label_list))
 
 args = TrainingArguments(
-    f"test-{task}",
+    "rise-ner",
     evaluation_strategy = "epoch",
     learning_rate=1e-4,
     per_device_train_batch_size=batch_size,
