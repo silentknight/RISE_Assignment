@@ -65,13 +65,6 @@ reduced_tags = {
     "I-DIS": 14,
 }
 
-exp = A
-if exp == A:
-    label_list = all_tags
-else:
-    label_list = reduced_tags
-
-
 def tokenize_and_align_labels(examples):
     label_all_tokens = True
     tokenized_inputs = tokenizer(list(examples["tokens"]), truncation=True, is_split_into_words=True)
@@ -97,6 +90,11 @@ def tokenize_and_align_labels(examples):
     tokenized_inputs["labels"] = labels
     return tokenized_inputs
 
+def filter_out_tags(example, tags_to_keep):
+    ner_tags: list = example["ner_tags"]
+    example["ner_tags"] = [0 if tag not in tags_to_keep else tag for tag in ner_tags]
+    return example
+
 
 dataset = load_dataset("Babelscape/multinerd", split=None)
 dataset_split = tuple(dataset.keys())
@@ -105,9 +103,15 @@ for split in dataset_split:
     dataset[split] = dataset[split].filter(lambda data: data["lang"] == "en")
     dataset[split] = dataset[split].remove_columns("lang")
 
-if exp==B:
-   for split in dataset_split:
 
+exp = A
+if exp == A:
+    label_list = all_tags
+else:
+    label_list = reduced_tags
+
+    for split in dataset_split:
+    	dataset[split] = dataset[split].map(filter_out_tags, fn_kwargs={reduced_tags})
 
 
 train_dataset = dataset["train"]
