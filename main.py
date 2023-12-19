@@ -1,13 +1,23 @@
-from datasets import load_metric, load_dataset, ClassLabel, DatasetDict, Sequence
+from datasets import load_metric, load_dataset, ClassLabel, Sequence
 from transformers import AutoTokenizer
 from transformers import AutoModelForTokenClassification, TrainingArguments, Trainer
 from transformers import DataCollatorForTokenClassification
 import numpy as np
 
+#-----------------------------------------------------------------------------------------------------------------------
+
+experimentType = "B"
+
+#-----------------------------------------------------------------------------------------------------------------------
+# Check for PyTorch
+#-----------------------------------------------------------------------------------------------------------------------
+
 import torch
 if torch.cuda.is_available():
     print("torch CUDA is available")
 
+#-----------------------------------------------------------------------------------------------------------------------
+# Using the XLNet LLM model for fine-tuning on the MultiNERD Named Entity Recognition Dataset
 #-----------------------------------------------------------------------------------------------------------------------
 
 model_checkpoint = "xlnet-base-cased"
@@ -15,7 +25,12 @@ batch_size = 8
 
 tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
 
+
 #-----------------------------------------------------------------------------------------------------------------------
+# Defining full taglist and subset of the taglist (PER, ORG, LOC, ANIM, and DIS)
+#-----------------------------------------------------------------------------------------------------------------------
+
+label_list = {}
 
 all_tags = {
     "O": 0,
@@ -65,6 +80,11 @@ reduced_tags = {
     "I-DIS": 14,
 }
 
+
+#-----------------------------------------------------------------------------------------------------------------------
+# Defining the functions to tokenize and load the MultiNERD dataset
+#-----------------------------------------------------------------------------------------------------------------------
+
 def tokenize_and_align_labels(examples):
     label_all_tokens = True
     tokenized_inputs = tokenizer(list(examples["tokens"]), truncation=True, is_split_into_words=True)
@@ -90,34 +110,12 @@ def tokenize_and_align_labels(examples):
     tokenized_inputs["labels"] = labels
     return tokenized_inputs
 
-def filter_out_tags(example, filtered_tags):
+def remove_excess_tags(example, filtered_tags):
     ner_tags = example["ner_tags"]
     example["ner_tags"] = [0 if tag not in filtered_tags else tag for tag in ner_tags]
     return example
 
-
-dataset = load_dataset("Babelscape/multinerd", split=None)
-dataset_split = tuple(dataset.keys())
-
-for split in dataset_split:
-    dataset[split] = dataset[split].filter(lambda data: data["lang"] == "en")
-    dataset[split] = dataset[split].remove_columns("lang")
-
-
-label_list = {}
-exp = "B"
-if exp=="A":
-    label_list = all_tags
-elif exp=="B":
-    label_list = reduced_tags
-
-    for split in dataset_split:
-    	dataset[split] = dataset[split].map(filter_out_tags, fn_kwargs={"filtered_tags": reduced_tags.values()})
-
-
-
 def get_labels_to_swap(label_dict: dict[int, str]) -> dict:
-    print("Inside")
     expected_key = 0
     ids_to_relabel = {}
 
@@ -127,15 +125,6 @@ def get_labels_to_swap(label_dict: dict[int, str]) -> dict:
         expected_key += 1
 
     return dict(sorted(ids_to_relabel.items(), key=lambda x: x[0], reverse=True))
-
-
-label2id = label_list
-id2label = {v: k for k, v in label_list.items()}
-id2label = dict(sorted(id2label.items()))
-
-
-labels_to_swap = get_labels_to_swap(id2label)
-
 
 def swap_labels_in_config(label2id, labels_to_swap):
     new_label2id = {}
@@ -167,6 +156,35 @@ def swap_labels_in_dataset(example, labels_to_swap):
 
     example["ner_tags"] = modified_ner_tags
     return example
+
+#-----------------------------------------------------------------------------------------------------------------------
+# Codes to load the MultiNERD dataset and tokenize
+#-----------------------------------------------------------------------------------------------------------------------
+
+dataset = load_dataset("Babelscape/multinerd", split=None)
+dataset_split = tuple(dataset.keys())
+
+for split in dataset_split:
+    dataset[split] = dataset[split].filter(lambda data: data["lang"] == "en")
+    dataset[split] = dataset[split].remove_columns("lang")
+
+if experimentType=="A":
+    label_list = all_tags
+elif experimentType=="B":
+    label_list = reduced_tags
+    for split in dataset_split:
+    	dataset[split] = dataset[split].map(remove_excess_tags, fn_kwargs={"filtered_tags": reduced_tags.values()})
+
+
+
+
+
+label2id = label_list
+id2label = {v: k for k, v in label_list.items()}
+id2label = dict(sorted(id2label.items()))
+labels_to_swap = get_labels_to_swap(id2label)
+
+
 
 if labels_to_swap:
     label2id, id2label = swap_labels_in_config(label2id, labels_to_swap=labels_to_swap)

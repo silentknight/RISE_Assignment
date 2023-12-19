@@ -2,3 +2,4 @@
 en/
 *.zip
 *.log
+tmp*
