@@ -1,4 +1,4 @@
-from datasets import load_metric, load_dataset
+from datasets import load_metric, load_dataset, ClassLabel, DatasetDict, Sequence
 from transformers import AutoTokenizer
 from transformers import AutoModelForTokenClassification, TrainingArguments, Trainer
 from transformers import DataCollatorForTokenClassification
@@ -90,9 +90,9 @@ def tokenize_and_align_labels(examples):
     tokenized_inputs["labels"] = labels
     return tokenized_inputs
 
-def filter_out_tags(example, tags_to_keep):
-    ner_tags: list = example["ner_tags"]
-    example["ner_tags"] = [0 if tag not in tags_to_keep else tag for tag in ner_tags]
+def filter_out_tags(example, filtered_tags):
+    ner_tags = example["ner_tags"]
+    example["ner_tags"] = [0 if tag not in filtered_tags else tag for tag in ner_tags]
     return example
 
 
@@ -104,14 +104,85 @@ for split in dataset_split:
     dataset[split] = dataset[split].remove_columns("lang")
 
 
-exp = A
-if exp == A:
+label_list = {}
+exp = "B"
+if exp=="A":
     label_list = all_tags
-else:
+elif exp=="B":
     label_list = reduced_tags
 
     for split in dataset_split:
-    	dataset[split] = dataset[split].map(filter_out_tags, fn_kwargs={reduced_tags})
+    	dataset[split] = dataset[split].map(filter_out_tags, fn_kwargs={"filtered_tags": reduced_tags.values()})
+
+
+
+def get_labels_to_swap(label_dict: dict[int, str]) -> dict:
+    print("Inside")
+    expected_key = 0
+    ids_to_relabel = {}
+
+    for key, value in label_dict.items():
+        if key != expected_key:
+            ids_to_relabel[key] = expected_key
+        expected_key += 1
+
+    return dict(sorted(ids_to_relabel.items(), key=lambda x: x[0], reverse=True))
+
+
+label2id = label_list
+id2label = {v: k for k, v in label_list.items()}
+id2label = dict(sorted(id2label.items()))
+
+
+labels_to_swap = get_labels_to_swap(id2label)
+
+
+def swap_labels_in_config(label2id, labels_to_swap):
+    new_label2id = {}
+    for _label, _id in label2id.items():
+        if _id in labels_to_swap:
+            new_label2id[_label] = labels_to_swap[_id]
+        else:
+            new_label2id[_label] = _id
+
+    id2label = {v: k for k, v in new_label2id.items()}
+
+    return new_label2id, id2label
+
+def swap_labels_in_dataset(example, labels_to_swap):
+    ner_tags = example["ner_tags"]
+
+    if all(tag == 0 for tag in ner_tags):
+        return example
+
+    modified_ner_tags = []
+    to_swap = list(labels_to_swap.keys())
+
+    for i in ner_tags:
+        if i in to_swap:
+            label_id = labels_to_swap[i]
+        else:
+            label_id = i
+        modified_ner_tags.append(label_id)
+
+    example["ner_tags"] = modified_ner_tags
+    return example
+
+if labels_to_swap:
+    label2id, id2label = swap_labels_in_config(label2id, labels_to_swap=labels_to_swap)
+
+    for split in dataset_split:
+        dataset[split] = dataset[split].map(swap_labels_in_dataset, fn_kwargs={"labels_to_swap": labels_to_swap}, num_proc=4)
+
+    swapped_labels = labels_to_swap
+
+
+
+class_labels = list(id2label.values())
+for split in dataset_split:
+    features = dataset[split].features.copy()
+    features["ner_tags"] = Sequence(feature=ClassLabel(names=class_labels))
+    dataset[split] = dataset[split].map(features=features)
 
 
 train_dataset = dataset["train"]
@@ -120,7 +191,7 @@ test_dataset = dataset["test"]
 train_tokenized_datasets = train_dataset.map(tokenize_and_align_labels, batched=True)
 test_tokenized_datasets = test_dataset.map(tokenize_and_align_labels, batched=True)
 
-
+#----------------------------------------------------------------------------------------------------------------
 
 model = AutoModelForTokenClassification.from_pretrained(model_checkpoint, num_labels=len(label_list))
 
