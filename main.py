@@ -118,38 +118,36 @@ def remove_excess_tags(example, filtered_tags):
 def labels_not_sequential(label_dict):
     expected_key = 0
     change_ids = {}
-
     for key, value in label_dict.items():
         if key-expected_key>0:
             change_ids[key] = expected_key
         expected_key += 1
-
     return dict(sorted(change_ids.items(), key=lambda x: x[0], reverse=True))
 
-def swap_labels_in_config(label2id, labels_to_change):
-    new_label2id = {}
-    for _label, _id in label2id.items():
+def change_label_main(label_list, labels_to_change):
+    new_label_list = {}
+    for _label, _id in label_list.items():
         if _id in labels_to_change:
-            new_label2id[_label] = labels_to_swap[_id]
+            new_label_list[_label] = labels_to_change[_id]
         else:
-            new_label2id[_label] = _id
+            new_label_list[_label] = _id
 
-    id2label = {v: k for k, v in new_label2id.items()}
+    label_id_list = {v: k for k, v in new_label_list.items()}
 
-    return new_label2id, id2label
+    return new_label_list, label_id_list
 
-def swap_labels_in_dataset(example, labels_to_change):
+def change_labels(example, labels_to_change):
     ner_tags = example["ner_tags"]
 
     if all(tag == 0 for tag in ner_tags):
         return example
 
     modified_ner_tags = []
-    to_swap = list(labels_to_swap.keys())
+    to_swap = list(labels_to_change.keys())
 
     for i in ner_tags:
         if i in to_swap:
-            label_id = labels_to_swap[i]
+            label_id = labels_to_change[i]
         else:
             label_id = i
         modified_ner_tags.append(label_id)
@@ -181,10 +179,10 @@ label_id_list = dict(sorted(label_id_list.items()))
 
 labels_to_change = labels_not_sequential(label_id_list)
 if labels_to_change:
-    label_list, label_id_list = swap_labels_in_config(label_list, labels_to_change=labels_to_change)
+    label_list, label_id_list = change_label_main(label_list, labels_to_change=labels_to_change)
 
     for split in dataset_split:
-        dataset[split] = dataset[split].map(swap_labels_in_dataset, fn_kwargs={"labels_to_change": labels_to_change}, num_proc=4)
+        dataset[split] = dataset[split].map(change_labels, fn_kwargs={"labels_to_change": labels_to_change}, num_proc=4)
 
 
 
