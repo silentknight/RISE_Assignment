@@ -1,6 +1,5 @@
-from datasets import load_metric
+from datasets import load_metric, load_dataset
 from transformers import AutoTokenizer
-import un_ner_tokens as get_tokens
 from transformers import AutoModelForTokenClassification, TrainingArguments, Trainer
 from transformers import DataCollatorForTokenClassification
 import numpy as np
@@ -12,7 +11,7 @@ if torch.cuda.is_available():
 #-----------------------------------------------------------------------------------------------------------------------
 
 model_checkpoint = "xlnet-base-cased"
-batch_size = 16
+batch_size = 8
 
 tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
 
@@ -66,7 +65,12 @@ reduced_tags = {
     "I-DIS": 14,
 }
 
-label_list = all_tags
+exp = A
+if exp == A:
+    label_list = all_tags
+else:
+    label_list = reduced_tags
+
 
 def tokenize_and_align_labels(examples):
     label_all_tokens = True
@@ -97,12 +101,17 @@ def tokenize_and_align_labels(examples):
 dataset = load_dataset("Babelscape/multinerd", split=None)
 dataset_split = tuple(dataset.keys())
 
-for split in self.data_split:
+for split in dataset_split:
     dataset[split] = dataset[split].filter(lambda data: data["lang"] == "en")
     dataset[split] = dataset[split].remove_columns("lang")
 
-train_dataset = datasets["train"]
-test_dataset = datasets["test"]
+if exp==B:
+   for split in dataset_split:
+
+
+
+train_dataset = dataset["train"]
+test_dataset = dataset["test"]
 
 train_tokenized_datasets = train_dataset.map(tokenize_and_align_labels, batched=True)
 test_tokenized_datasets = test_dataset.map(tokenize_and_align_labels, batched=True)
@@ -117,8 +126,9 @@ args = TrainingArguments(
     learning_rate=1e-4,
     per_device_train_batch_size=batch_size,
     per_device_eval_batch_size=batch_size,
-    num_train_epochs=10,
+    num_train_epochs=5,
     weight_decay=0.00001,
+    save_steps=50000,
 )
 
 data_collator = DataCollatorForTokenClassification(tokenizer)
@@ -161,4 +171,4 @@ trainer.train()
 
 trainer.evaluate()
 
-trainer.save_model('un-ner.model')
+trainer.save_model('rise.model')
