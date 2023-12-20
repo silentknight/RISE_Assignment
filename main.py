@@ -3,10 +3,16 @@ from transformers import AutoTokenizer
 from transformers import AutoModelForTokenClassification, TrainingArguments, Trainer
 from transformers import DataCollatorForTokenClassification
 import numpy as np
+import argparse
 
 #-----------------------------------------------------------------------------------------------------------------------
 
-experimentType = "B"
+parser = argparse.ArgumentParser(description='RISE Assignment')
+parser.add_argument('--exp', type=str, default='A',
+                    help='Experiment A with full taglist, Experiment B with reduced taglist.')
+
+args = parser.parse_args()
+experimentType = args.exp
 
 #-----------------------------------------------------------------------------------------------------------------------
 # Check for PyTorch
@@ -24,7 +30,6 @@ model_checkpoint = "xlnet-base-cased"
 batch_size = 8
 
 tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
-
 
 #-----------------------------------------------------------------------------------------------------------------------
 # Defining full taglist and subset of the taglist (PER, ORG, LOC, ANIM, and DIS)
@@ -80,6 +85,13 @@ reduced_tags = {
     "I-DIS": 14,
 }
 
+if experimentType=="A":
+    label_list = all_tags
+elif experimentType=="B":
+    label_list = reduced_tags
+
+label_id_list = {v: k for k, v in label_list.items()}
+label_id_list = dict(sorted(label_id_list.items()))
 
 #-----------------------------------------------------------------------------------------------------------------------
 # Defining the functions to tokenize and load the MultiNERD dataset
@@ -158,16 +170,9 @@ for split in dataset_split:
     dataset[split] = dataset[split].filter(lambda data: data["lang"] == "en")
     dataset[split] = dataset[split].remove_columns("lang")
 
-if experimentType=="A":
-    label_list = all_tags
-elif experimentType=="B":
-    label_list = reduced_tags
+if experimentType=="B":
     for split in dataset_split:
-    	dataset[split] = dataset[split].map(remove_excess_tags, fn_kwargs={"filtered_tags": reduced_tags.values()}, num_proc=4)
-
-
-label_id_list = {v: k for k, v in label_list.items()}
-label_id_list = dict(sorted(label_id_list.items()))
+    	dataset[split] = dataset[split].map(remove_excess_tags, fn_kwargs={"filtered_tags": label_list.values()}, num_proc=4)
 
 labels_to_change = labels_not_sequential(label_id_list)
 if labels_to_change:
@@ -176,17 +181,20 @@ if labels_to_change:
     for split in dataset_split:
         dataset[split] = dataset[split].map(change_labels, fn_kwargs={"labels_to_change": labels_to_change}, num_proc=4)
 
-#class_labels = list(label_id_list.values())
-#for split in dataset_split:
-#    features = dataset[split].features.copy()
-#    features["ner_tags"] = Sequence(feature=ClassLabel(names=class_labels))
-#    dataset[split] = dataset[split].map(features=features)
-
 train_dataset = dataset["train"]
 test_dataset = dataset["test"]
 
 train_tokenized_datasets = train_dataset.map(tokenize_and_align_labels, batched=True)
 test_tokenized_datasets = test_dataset.map(tokenize_and_align_labels, batched=True)
+
+f = open("stuff.dat","w")
+f.write(str(test_tokenized_datasets['tokens']))
+f.write(str(test_tokenized_datasets['ner_tags']))
+f.write(str(test_tokenized_datasets['input_ids']))
+f.write(str(test_tokenized_datasets['token_type_ids']))
+f.write(str(test_tokenized_datasets['attention_mask']))
+f.write(str(test_tokenized_datasets['labels']))
+f.close()
 
 #-----------------------------------------------------------------------------------------------------------------------
 # Defining the model and Training arguments
@@ -211,12 +219,16 @@ metric = load_metric("seqeval")
 #-----------------------------------------------------------------------------------------------------------------------
 # Computing the metrics
 #-----------------------------------------------------------------------------------------------------------------------
+import sys
+np.set_printoptions(threshold=sys.maxsize)
 
 def compute_metrics(p):
     predictions, labels = p
-    predictions = np.argmax(predictions, axis=2)
 
-    print(p, predictions)
+    print(predictions)
+    print(labels)
+
+    predictions = np.argmax(predictions, axis=2)
 
     # Remove ignored index (special tokens)
     true_predictions = [
