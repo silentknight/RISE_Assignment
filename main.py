@@ -4,6 +4,8 @@ from transformers import AutoModelForTokenClassification, TrainingArguments, Tra
 from transformers import DataCollatorForTokenClassification
 import numpy as np
 import argparse
+import os
+import json
 
 #-----------------------------------------------------------------------------------------------------------------------
 
@@ -198,15 +200,6 @@ test_tokenized_datasets = test_dataset.map(tokenize_and_align_labels, batched=Tr
 train_tokenized_datasets = train_tokenized_datasets.map(replace_id_with_labels, fn_kwargs={"mapping_dict": label_id_list}, num_proc=4)
 test_tokenized_datasets = test_tokenized_datasets.map(replace_id_with_labels, fn_kwargs={"mapping_dict": label_id_list}, num_proc=4)
 
-f = open("stuff.dat","w")
-f.write(str(test_tokenized_datasets['tokens']))
-f.write(str(test_tokenized_datasets['ner_tags']))
-f.write(str(test_tokenized_datasets['input_ids']))
-f.write(str(test_tokenized_datasets['token_type_ids']))
-f.write(str(test_tokenized_datasets['attention_mask']))
-f.write(str(test_tokenized_datasets['labels']))
-f.close()
-
 #-----------------------------------------------------------------------------------------------------------------------
 # Defining the model and Training arguments
 #-----------------------------------------------------------------------------------------------------------------------
@@ -245,6 +238,21 @@ def compute_metrics(p):
     ]
 
     results = metric.compute(predictions=true_predictions, references=true_labels)
+
+    for i in results.keys():
+        if not i.startswith("overall"):
+            print(f"Entity: {i}")
+            for res in results[i]:
+                if res != "number":
+                    print(f"{res} \t {results[i][res]}")
+
+    metrics_fname = f"metrics_of_{experimentType}.jsonl"
+    if not os.path.exists(metrics_fname):
+        open(metrics_fname, "w").close()
+
+    with open(metrics_fname, "a") as f:
+        f.write(json.dumps(results, default=str) + "\n")
+
     return {
         "precision": results["overall_precision"],
         "recall": results["overall_recall"],
