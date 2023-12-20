@@ -159,6 +159,14 @@ def change_labels(example, labels_to_change):
     example["ner_tags"] = modified_ner_tags
     return example
 
+def replace_id_with_labels(example, mapping_dict):
+    ner_tags = example["ner_tags"]
+    modified_ner_tags = []
+    for i in ner_tags:
+        modified_ner_tags.append(mapping_dict.get(i,i))
+    example["ner_tags"] = modified_ner_tags
+    return example
+
 #-----------------------------------------------------------------------------------------------------------------------
 # Codes to load the MultiNERD dataset and tokenize
 #-----------------------------------------------------------------------------------------------------------------------
@@ -186,6 +194,9 @@ test_dataset = dataset["test"]
 
 train_tokenized_datasets = train_dataset.map(tokenize_and_align_labels, batched=True)
 test_tokenized_datasets = test_dataset.map(tokenize_and_align_labels, batched=True)
+
+train_tokenized_datasets = train_tokenized_datasets.map(replace_id_with_labels, fn_kwargs={"mapping_dict": label_id_list}, num_proc=4)
+test_tokenized_datasets = test_tokenized_datasets.map(replace_id_with_labels, fn_kwargs={"mapping_dict": label_id_list}, num_proc=4)
 
 f = open("stuff.dat","w")
 f.write(str(test_tokenized_datasets['tokens']))
@@ -219,18 +230,11 @@ metric = load_metric("seqeval")
 #-----------------------------------------------------------------------------------------------------------------------
 # Computing the metrics
 #-----------------------------------------------------------------------------------------------------------------------
-import sys
-np.set_printoptions(threshold=sys.maxsize)
 
 def compute_metrics(p):
     predictions, labels = p
-
-    print(predictions)
-    print(labels)
-
     predictions = np.argmax(predictions, axis=2)
 
-    # Remove ignored index (special tokens)
     true_predictions = [
         [label_list[p] for (p, l) in zip(prediction, label) if l != -100]
         for prediction, label in zip(predictions, labels)
