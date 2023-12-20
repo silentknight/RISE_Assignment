@@ -131,24 +131,19 @@ def change_label_main(label_list, labels_to_change):
             new_label_list[_label] = labels_to_change[_id]
         else:
             new_label_list[_label] = _id
-
     label_id_list = {v: k for k, v in new_label_list.items()}
-
     return new_label_list, label_id_list
 
 def change_labels(example, labels_to_change):
     ner_tags = example["ner_tags"]
-
     modified_ner_tags = []
     to_swap = list(labels_to_change.keys())
-
     for i in ner_tags:
         if i in to_swap:
             label_id = labels_to_change[i]
         else:
             label_id = i
         modified_ner_tags.append(label_id)
-
     example["ner_tags"] = modified_ner_tags
     return example
 
@@ -181,12 +176,11 @@ if labels_to_change:
     for split in dataset_split:
         dataset[split] = dataset[split].map(change_labels, fn_kwargs={"labels_to_change": labels_to_change}, num_proc=4)
 
-
-class_labels = list(label_id_list.values())
-for split in dataset_split:
-    features = dataset[split].features.copy()
-    features["ner_tags"] = Sequence(feature=ClassLabel(names=class_labels))
-    dataset[split] = dataset[split].map(features=features)
+#class_labels = list(label_id_list.values())
+#for split in dataset_split:
+#    features = dataset[split].features.copy()
+#    features["ner_tags"] = Sequence(feature=ClassLabel(names=class_labels))
+#    dataset[split] = dataset[split].map(features=features)
 
 train_dataset = dataset["train"]
 test_dataset = dataset["test"]
@@ -194,7 +188,9 @@ test_dataset = dataset["test"]
 train_tokenized_datasets = train_dataset.map(tokenize_and_align_labels, batched=True)
 test_tokenized_datasets = test_dataset.map(tokenize_and_align_labels, batched=True)
 
-#----------------------------------------------------------------------------------------------------------------
+#-----------------------------------------------------------------------------------------------------------------------
+# Defining the model and Training arguments
+#-----------------------------------------------------------------------------------------------------------------------
 
 model = AutoModelForTokenClassification.from_pretrained(model_checkpoint, num_labels=len(label_list))
 
@@ -212,10 +208,15 @@ args = TrainingArguments(
 data_collator = DataCollatorForTokenClassification(tokenizer)
 metric = load_metric("seqeval")
 
+#-----------------------------------------------------------------------------------------------------------------------
+# Computing the metrics
+#-----------------------------------------------------------------------------------------------------------------------
 
 def compute_metrics(p):
     predictions, labels = p
     predictions = np.argmax(predictions, axis=2)
+
+    print(p, predictions)
 
     # Remove ignored index (special tokens)
     true_predictions = [
@@ -234,6 +235,10 @@ def compute_metrics(p):
         "f1": results["overall_f1"],
         "accuracy": results["overall_accuracy"],
     }
+
+#-----------------------------------------------------------------------------------------------------------------------
+# Start Training
+#-----------------------------------------------------------------------------------------------------------------------
 
 trainer = Trainer(
     model,
