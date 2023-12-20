@@ -139,9 +139,6 @@ def change_label_main(label_list, labels_to_change):
 def change_labels(example, labels_to_change):
     ner_tags = example["ner_tags"]
 
-    if all(tag == 0 for tag in ner_tags):
-        return example
-
     modified_ner_tags = []
     to_swap = list(labels_to_change.keys())
 
@@ -185,13 +182,11 @@ if labels_to_change:
         dataset[split] = dataset[split].map(change_labels, fn_kwargs={"labels_to_change": labels_to_change}, num_proc=4)
 
 
-
-class_labels = list(id2label.values())
+class_labels = list(label_id_list.values())
 for split in dataset_split:
     features = dataset[split].features.copy()
     features["ner_tags"] = Sequence(feature=ClassLabel(names=class_labels))
     dataset[split] = dataset[split].map(features=features)
-
 
 train_dataset = dataset["train"]
 test_dataset = dataset["test"]
