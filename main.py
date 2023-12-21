@@ -279,4 +279,4 @@ trainer.train()
 
 trainer.evaluate()
 
-trainer.save_model('rise_{model_checkpoint}_{experimentType}.model')
+trainer.save_model(f'rise_{model_checkpoint}_{experimentType}.model')
