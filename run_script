@@ -1,4 +1,4 @@
 #!/bin/bash
 
-python -u main.py --exp A
 python -u main.py --exp B
+python -u main.py --exp A
