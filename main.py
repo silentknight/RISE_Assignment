@@ -28,7 +28,7 @@ if torch.cuda.is_available():
 # Using the XLNet LLM model for fine-tuning on the MultiNERD Named Entity Recognition Dataset
 #-----------------------------------------------------------------------------------------------------------------------
 
-model_checkpoint = "xlnet-base-cased"
+model_checkpoint = "distilbert-base-cased"
 batch_size = 8
 
 tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
@@ -208,14 +208,14 @@ label_list = list(label_list.keys())
 model = AutoModelForTokenClassification.from_pretrained(model_checkpoint, num_labels=len(label_list))
 
 args = TrainingArguments(
-    f"rise-ner-{experimentType}",
+    f"rise-ner-{model_checkpoint}-{experimentType}",
     evaluation_strategy = "epoch",
     learning_rate=1e-4,
     per_device_train_batch_size=batch_size,
     per_device_eval_batch_size=batch_size,
     num_train_epochs=5,
     weight_decay=0.00001,
-    save_steps=100,
+    save_steps=100000,
 )
 
 data_collator = DataCollatorForTokenClassification(tokenizer)
@@ -247,7 +247,7 @@ def compute_metrics(p):
                 if res != "number":
                     print(f"{res} \t {results[i][res]}")
 
-    metrics_fname = f"metrics_of_{experimentType}.jsonl"
+    metrics_fname = f"metrics_of_{model_checkpoint}_{experimentType}.jsonl"
     if not os.path.exists(metrics_fname):
         open(metrics_fname, "w").close()
 
@@ -279,4 +279,4 @@ trainer.train()
 
 trainer.evaluate()
 
-trainer.save_model('rise.model')
+trainer.save_model('rise_{model_checkpoint}_{experimentType}.model')
