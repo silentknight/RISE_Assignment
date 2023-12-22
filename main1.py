@@ -28,7 +28,7 @@ if torch.cuda.is_available():
 # Using the XLNet LLM model for fine-tuning on the MultiNERD Named Entity Recognition Dataset
 #-----------------------------------------------------------------------------------------------------------------------
 
-model_checkpoint = "distilbert-base-cased"
+model_checkpoint = "xlnet-base-cased"
 batch_size = 8
 
 tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)

@@ -1,0 +1,5 @@
+torch CUDA is available
+Downloading tokenizer_config.json:   0%|          | 0.00/29.0 [00:00<?, ?B/s]Downloading tokenizer_config.json: 100%|██████████| 29.0/29.0 [00:00<00:00, 2.04kB/s]
+Downloading config.json:   0%|          | 0.00/570 [00:00<?, ?B/s]Downloading config.json: 100%|██████████| 570/570 [00:00<00:00, 42.3kB/s]
+Downloading vocab.txt:   0%|          | 0.00/213k [00:00<?, ?B/s]Downloading vocab.txt: 100%|██████████| 213k/213k [00:00<00:00, 11.5MB/s]
+Downloading tokenizer.json:   0%|          | 0.00/436k [00:00<?, ?B/s]Downloading tokenizer.json: 100%|██████████| 436k/436k [00:00<00:00, 12.8MB/s]
